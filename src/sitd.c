@@ -26,7 +26,7 @@ int main () {
     tunnel = tunnels;
 
     while (tunnel != NULL) {
-        sit_destroy(sk, tunnels->name);
+        sit_destroy(sk, tunnel->name);
         sit_configure(sk, tunnel, NULL);
         log_debug("%d name: %s, l: %s, r: %s, a: %s, m: %d, s: %d\n", tunnel->id, tunnel->name, tunnel->remote, tunnel->local, tunnel->address, tunnel->mtu, tunnel->state);
         tunnel = tunnel->next;
