@@ -5,6 +5,11 @@
 #include <linux/if.h>
 #include <netinet/in.h>
 
+typedef enum tunnel_state {
+    STATE_RUNNING,
+    STETE_STOPPED
+} tunnel_state_t;
+
 typedef struct sit_route {
     uint32_t id;
     uint32_t tunnel_id;
@@ -15,6 +20,7 @@ typedef struct sit_route {
 
 typedef struct sit_tunnel {
     uint32_t id;
+    tunnel_state_t state;
     char name[IFNAMSIZ];
     char local[INET_ADDRSTRLEN];
     char remote[INET_ADDRSTRLEN];

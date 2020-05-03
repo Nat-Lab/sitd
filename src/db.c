@@ -50,6 +50,7 @@ static int db_init() {
         "PRAGMA foreign_keys=ON;"
         "CREATE TABLE IF NOT EXISTS `tunnels` ("
             "`id`       INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,"
+            "`state`      INTEGER NOT NULL,"
             "`name`     TEXT NOT NULL UNIQUE,"
             "`local`    TEXT NOT NULL,"
             "`remote`   TEXT NOT NULL UNIQUE,"
@@ -77,8 +78,8 @@ static int db_init() {
 
     err = sqlite3_prepare_v2(db, "select * from tunnels", -1, &stmt_get_tunnels, NULL);
     err += sqlite3_prepare_v2(db, "select * from tunnels where `name` = ?", -1, &stmt_get_tunnel, NULL);
-    err += sqlite3_prepare_v2(db, "insert into tunnels (`name`, `local`, `remote`, `address`, `mtu`) values (?, ?, ?, ?, ?)", -1, &stmt_insert_tunnel, NULL);
-    err += sqlite3_prepare_v2(db, "update tunnels set (`name`, `local`, `remote`, `address`, `mtu`) = (?, ?, ?, ?, ?) where `id` = ?", -1, &stmt_update_tunnel, NULL);
+    err += sqlite3_prepare_v2(db, "insert into tunnels (`state`, `name`, `local`, `remote`, `address`, `mtu`) values (?, ?, ?, ?, ?)", -1, &stmt_insert_tunnel, NULL);
+    err += sqlite3_prepare_v2(db, "update tunnels set (`state`, `name`, `local`, `remote`, `address`, `mtu`) = (?, ?, ?, ?, ?) where `id` = ?", -1, &stmt_update_tunnel, NULL);
 
     err += sqlite3_prepare_v2(db, "select * from routes where `tunnel_id` = ?", -1, &stmt_get_routes, NULL);
     err += sqlite3_prepare_v2(db, "select * from routes where `tunnel_id` = ? and `route` = ?", -1, &stmt_get_route, NULL);
@@ -158,11 +159,12 @@ int db_get_tunnels(sit_tunnel_t **tunnels) {
         }
 
         current->id = sqlite3_column_int(stmt_get_tunnels, 0);
-        strncpy(current->name, sqlite3_column_text(stmt_get_tunnels, 1), IFNAMSIZ);
-        strncpy(current->local, sqlite3_column_text(stmt_get_tunnels, 2), INET_ADDRSTRLEN);
-        strncpy(current->remote, sqlite3_column_text(stmt_get_tunnels, 3), INET_ADDRSTRLEN);
-        strncpy(current->address, sqlite3_column_text(stmt_get_tunnels, 4), INET6_ADDRSTRLEN + 4);
-        current->mtu = sqlite3_column_int(stmt_get_tunnels, 5);
+        current->state = sqlite3_column_int(stmt_get_tunnels, 1);
+        strncpy(current->name, sqlite3_column_text(stmt_get_tunnels, 2), IFNAMSIZ);
+        strncpy(current->local, sqlite3_column_text(stmt_get_tunnels, 3), INET_ADDRSTRLEN);
+        strncpy(current->remote, sqlite3_column_text(stmt_get_tunnels, 4), INET_ADDRSTRLEN);
+        strncpy(current->address, sqlite3_column_text(stmt_get_tunnels, 5), INET6_ADDRSTRLEN + 4);
+        current->mtu = sqlite3_column_int(stmt_get_tunnels, 6);
         
         prev = current;
         current->next = (sit_tunnel_t *) malloc(sizeof(sit_tunnel_t));
@@ -200,7 +202,7 @@ int main () {
     tunnel = tunnels;
 
     while (tunnel != NULL) {
-        log_debug("%d name: %s, l: %s, r: %s, a: %s, m: %d.\n", tunnel->id, tunnel->name, tunnel->remote, tunnel->local, tunnel->address, tunnel->mtu);
+        log_debug("%d name: %s, l: %s, r: %s, a: %s, m: %d, s: %d\n", tunnel->id, tunnel->name, tunnel->remote, tunnel->local, tunnel->address, tunnel->mtu, tunnel->state);
         tunnel = tunnel->next;
     }
 
