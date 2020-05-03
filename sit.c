@@ -11,7 +11,6 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
     struct nl_cache *cache = NULL;
     struct rtnl_link *sit_link;
     in_addr_t laddr, raddr;
-    struct in6_addr addr6;
     struct nl_addr* local_addr = NULL;
     struct rtnl_addr* rtnl_addr = NULL;
     const sit_route_t *route_ptr = config->routes;
@@ -82,7 +81,6 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
     }
 
     ifindex = rtnl_link_get_ifindex(sit_link);
-    rtnl_link_put(sit_link);
     if (ifindex == 0) {
         log_fatal("rtnl_link_get_ifindex(): can't get interface index.\n");
         err = 1;
@@ -93,7 +91,7 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
     rtnl_addr_set_ifindex(rtnl_addr, ifindex);
     rtnl_addr_set_local(rtnl_addr, local_addr);
     
-    err = rtnl_addr_add(sk, rtnl_addr, 0);
+    err = rtnl_addr_add(sk, rtnl_addr, NLM_F_REPLACE);
     if (err < 0) {
         log_fatal("rtnl_addr_add(): %s.\n", nl_geterror(err));
         goto end;
@@ -142,7 +140,7 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
         address = NULL;
         rtnl_route_add_nexthop(rtnl_route, nexthop);
 
-        err = rtnl_route_add(sk, rtnl_route, NLM_F_CREATE);
+        err = rtnl_route_add(sk, rtnl_route, NLM_F_CREATE | NLM_F_REPLACE);
         if (err < 0) {
             log_fatal("rtnl_route_add(): %s.\n", nl_geterror(err));
             goto route_end;
