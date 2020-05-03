@@ -1,6 +1,8 @@
 cmake_minimum_required (VERSION 2.6)
 project (sitctl C)
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O2 -Wall -Wextra")
+
 find_path(NL_INCLUDE_DIR netlink/netlink.h
     /usr/include
     /usr/include/libnl3
