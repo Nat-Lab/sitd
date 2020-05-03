@@ -1,5 +1,7 @@
 #include <netlink/route/link/sit.h>
 #include <netlink/route/addr.h>
+#include <netlink/route/route.h>
+
 #include <arpa/inet.h>
 #include <linux/if.h>
 #include "sit.h"
@@ -12,7 +14,10 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
     struct in6_addr addr6;
     struct nl_addr* local_addr = NULL;
     struct rtnl_addr* rtnl_addr = NULL;
+    const sit_route_t *route_ptr = config->routes;
     int err, ifindex;
+
+    /* create sit tunnel */
 
     err = inet_pton(AF_INET, config->local, &laddr);
     if (err != 1) {
@@ -28,13 +33,6 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
         goto end;
     }
 
-    err = inet_pton(AF_INET6, config->address, &addr6);
-    if (err != 1) {
-        err = 1;
-        log_fatal("inet_pton(): bad interface address.\n");
-        goto end;
-    }
-
     err = rtnl_link_alloc_cache(sk, AF_UNSPEC, &cache);
     if (err < 0) {
         log_fatal("rtnl_link_alloc_cache(): %s.\n", nl_geterror(err));
@@ -43,7 +41,8 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
 
     sit_link = rtnl_link_sit_alloc();
     if (sit_link == NULL) {
-        log_fatal("rtnl_link_sit_alloc(): %s.\n", nl_geterror(err));
+        err = 1;
+        log_fatal("rtnl_link_sit_alloc(): can't allocate.\n");
         goto end;
     }
 
@@ -65,16 +64,19 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
 
     rtnl_link_put(sit_link);
 
-    local_addr = nl_addr_build(AF_INET6, &addr6, sizeof(struct in6_addr));
-    if (local_addr == NULL) {
-        log_fatal("nl_addr_build(): %s.\n", nl_geterror(err));
+    /* configure tunnel address */
+
+    err = nl_addr_parse(config->address, AF_INET6, &local_addr);
+    if (err < 0) {
+        err = 1;
+        log_fatal("nl_addr_parse(): %s.\n", nl_geterror(err));
         goto end;
     }
-    nl_addr_set_prefixlen(local_addr, config->address_mask);
 
     sit_link = NULL;
     err = sit_get(sk, config->name, &sit_link);
     if (err < 0 || sit_link == NULL) {
+        err = 1;
         log_fatal("sit_get(): can't get interface.\n");
         goto end;
     }
@@ -91,17 +93,74 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
     rtnl_addr_set_ifindex(rtnl_addr, ifindex);
     rtnl_addr_set_local(rtnl_addr, local_addr);
     
-    
     err = rtnl_addr_add(sk, rtnl_addr, 0);
     if (err < 0) {
         log_fatal("rtnl_addr_add(): %s.\n", nl_geterror(err));
         goto end;
     }
 
+    /* configure routing */
+
+    while (route_ptr != NULL) {
+        struct rtnl_route *rtnl_route = rtnl_route_alloc();
+        struct rtnl_nexthop *nexthop = rtnl_route_nh_alloc();
+        struct nl_addr* address = NULL;
+
+        if (rtnl_route == NULL) {
+            err = 1;
+            log_fatal("rtnl_route_alloc(): can't alloc.\n");
+            goto route_end;
+        }
+
+        rtnl_route_set_family(rtnl_route, AF_INET6);
+        err = nl_addr_parse(route_ptr->prefix, AF_INET6, &address);
+        if (err < 0) {
+            log_fatal("nl_addr_parse(): %s.\n", nl_geterror(err));
+            goto route_end;
+        }
+
+        rtnl_route_set_dst(rtnl_route, address);
+        nl_addr_put(address);
+        address = NULL;
+
+        if (nexthop == NULL) {
+            err = 1;
+            log_fatal("rtnl_route_nh_alloc(): can't alloc.\n");
+            goto route_end;
+        }
+
+        rtnl_route_nh_set_ifindex(nexthop, ifindex);
+
+        err = nl_addr_parse(route_ptr->nexthop, AF_INET6, &address);
+        if (err < 0) {
+            log_fatal("nl_addr_parse(): %s.\n", nl_geterror(err));
+            goto route_end;
+        }
+
+        rtnl_route_nh_set_gateway(nexthop, address);
+        nl_addr_put(address);
+        address = NULL;
+        rtnl_route_add_nexthop(rtnl_route, nexthop);
+
+        err = rtnl_route_add(sk, rtnl_route, NLM_F_CREATE);
+        if (err < 0) {
+            log_fatal("rtnl_route_add(): %s.\n", nl_geterror(err));
+            goto route_end;
+        }
+
+route_end:
+        if (address != NULL) nl_addr_put(address);
+        if (rtnl_route != NULL) rtnl_route_put(rtnl_route);
+        // FIXME: free nexthop?
+        route_ptr = route_ptr->next;
+        if (err != 0) goto end;
+    }
+
 end:
     if (local_addr != NULL) nl_addr_put(local_addr);
     if (rtnl_addr != NULL) rtnl_addr_put(rtnl_addr);
     if (cache != NULL) nl_cache_free(cache);
+    if (sit_link != NULL) rtnl_link_put(sit_link);
 
     return err;
 }
