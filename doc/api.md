@@ -1,5 +1,4 @@
-`sitd` API Reference
----
+# `sitd` API Reference
 
 `sitd` utilizes a simple restful interface for tunnel management.
 
