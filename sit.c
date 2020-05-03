@@ -6,12 +6,12 @@
 #include "log.h"
 
 int sit_create(struct nl_sock *sk, const sit_config_t *config) {
-    struct nl_cache *cache;
+    struct nl_cache *cache = NULL;
 	struct rtnl_link *sit_link;
 	in_addr_t laddr, raddr;
     struct in6_addr addr6;
-    struct nl_addr* local_addr;
-    struct rtnl_addr* rtnl_addr;
+    struct nl_addr* local_addr = NULL;
+    struct rtnl_addr* rtnl_addr = NULL;
 	int err, ifindex;
 
     err = inet_pton(AF_INET, config->local, &laddr);
@@ -63,29 +63,58 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
         goto end;
     }
 
-    /* todo: set address */
+    rtnl_link_put(sit_link);
+
+    local_addr = nl_addr_build(AF_INET6, &addr6, sizeof(struct in6_addr));
+    if (local_addr == NULL) {
+        log_fatal("nl_addr_build(): %s.\n", nl_geterror(err));
+        goto end;
+    }
+    nl_addr_set_prefixlen(local_addr, config->address_mask);
+
+    sit_link = NULL;
+    err = sit_get(sk, config->name, &sit_link);
+    if (err < 0 || sit_link == NULL) {
+        log_fatal("sit_get(): can't get interface.\n");
+        goto end;
+    }
+
+    ifindex = rtnl_link_get_ifindex(sit_link);
+    rtnl_link_put(sit_link);
+    if (ifindex == 0) {
+        log_fatal("rtnl_link_get_ifindex(): can't get interface index.\n");
+        err = 1;
+        goto end;
+    }
+
+    rtnl_addr = rtnl_addr_alloc();
+    rtnl_addr_set_ifindex(rtnl_addr, ifindex);
+    rtnl_addr_set_local(rtnl_addr, local_addr);
+    
+    
+    err = rtnl_addr_add(sk, rtnl_addr, 0);
+    if (err < 0) {
+        log_fatal("rtnl_addr_add(): %s.\n", nl_geterror(err));
+        goto end;
+    }
 
 end:
-    nl_addr_put(local_addr);
-    rtnl_addr_put(rtnl_addr);
-    rtnl_link_put(sit_link);
-    nl_cache_free(cache);
+    if (local_addr != NULL) nl_addr_put(local_addr);
+    if (rtnl_addr != NULL) rtnl_addr_put(rtnl_addr);
+    if (cache != NULL) nl_cache_free(cache);
 
     return err;
 }
 
 int sit_destroy(struct nl_sock *sk, const char *name) {
-    struct nl_cache *cache;
-	int err;
+    int err;
+    struct rtnl_link *sit_link;
 
-    err = rtnl_link_alloc_cache(sk, AF_UNSPEC, &cache);
-    if (err < 0) {
-        log_fatal("rtnl_link_alloc_cache(): %s.\n", nl_geterror(err));
+    err = sit_get(sk, name, &sit_link);
+    if (err == 1) {
+        err = 0; // non fatal
         goto end;
-    }
-
-    struct rtnl_link *sit_link = rtnl_link_get_by_name(cache, name);
-    if (sit_link == NULL) return 0;
+    } else if (err < 0) goto end;
 
     err = rtnl_link_delete(sk, sit_link);
     if (err < 0) {
@@ -95,7 +124,36 @@ int sit_destroy(struct nl_sock *sk, const char *name) {
 
 end:
     rtnl_link_put(sit_link);
-    nl_cache_free(cache);
+    return err;
+}
 
+int sit_get(struct nl_sock *sk, const char *name, struct rtnl_link **link) {
+    struct nl_cache *cache;
+	int err;
+
+    *link = NULL;
+
+    err = rtnl_link_alloc_cache(sk, AF_UNSPEC, &cache);
+    if (err < 0) {
+        log_fatal("rtnl_link_alloc_cache(): %s.\n", nl_geterror(err));
+        goto end;
+    }
+
+    struct rtnl_link *sit_link = rtnl_link_get_by_name(cache, name);
+    if (sit_link == NULL) {
+        err = 1;
+        goto end;
+    }
+
+    if (!rtnl_link_is_sit(sit_link)) {
+        err = -1;
+        log_fatal("rtnl_link_is_sit(): link is not sit.\n");
+        goto end;
+    }
+
+    *link = sit_link;
+
+end:
+    nl_cache_free(cache);
     return err;
 }

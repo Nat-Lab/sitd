@@ -1,5 +1,5 @@
-#ifndef SITD_SIT_H
-#define SITD_SIT_H
+#ifndef SITCTL_SIT_H
+#define SITCTL_SIT_H
 #include <stdint.h>
 
 typedef struct sit_config {
@@ -7,10 +7,12 @@ typedef struct sit_config {
     const char *local;
     const char *remote;
     const char *address;
+    uint8_t address_mask;
     uint32_t mtu;
 } sit_config_t;
 
+int sit_get(struct nl_sock *sk, const char *name, struct rtnl_link **link);
 int sit_create(struct nl_sock *sk, const sit_config_t *config);
 int sit_destroy(struct nl_sock *sk, const char *name);
 
-#endif // SITD_SIT_H
+#endif // SITCTL_SIT_H
