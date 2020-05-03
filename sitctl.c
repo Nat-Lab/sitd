@@ -22,9 +22,20 @@ int main () {
     config.local = "172.17.0.14";
     config.remote = "172.17.0.1";
     config.name = "sit2";
-    config.address = "fd00::1";
-    config.address_mask = 64;
+    config.address = "fd00::1/64";
     config.mtu = 0;
+
+    sit_route_t route;
+    route.prefix = "2602:feda:333::/48";
+    route.nexthop = "fd00::2";
+
+    sit_route_t route2;
+    route2.prefix = "2602:feda:444::/48";
+    route2.nexthop = "fd00::3";
+    route2.next = NULL;
+    route.next = &route2;
+
+    config.routes = &route;
 
     sit_destroy(sk, "sit2");
     sit_create(sk, &config);
