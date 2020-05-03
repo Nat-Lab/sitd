@@ -27,11 +27,11 @@ int main () {
 
     sit_route_t route;
     route.prefix = "2602:feda:333::/48";
-    route.nexthop = "fd00::2";
+    route.nexthop = "fd00::6";
 
     sit_route_t route2;
     route2.prefix = "2602:feda:444::/48";
-    route2.nexthop = "fd00::3";
+    route2.nexthop = "fd00::7";
     route2.next = NULL;
     route.next = &route2;
 

@@ -25,8 +25,8 @@ endif (NL_INCLUDE_DIR AND NL_LIBRARY)
 include_directories("${PROJECT_SOURCE_DIR}" "${NL_INCLUDE_DIR}")
 
 add_executable(sitctl 
-    sit.c
-    sitctl.c
+    src/sit.c
+    src/sitctl.c
 )
 
 target_link_libraries(sitctl ${NL_LIBRARIES})
