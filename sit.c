@@ -7,12 +7,12 @@
 
 int sit_create(struct nl_sock *sk, const sit_config_t *config) {
     struct nl_cache *cache = NULL;
-	struct rtnl_link *sit_link;
-	in_addr_t laddr, raddr;
+    struct rtnl_link *sit_link;
+    in_addr_t laddr, raddr;
     struct in6_addr addr6;
     struct nl_addr* local_addr = NULL;
     struct rtnl_addr* rtnl_addr = NULL;
-	int err, ifindex;
+    int err, ifindex;
 
     err = inet_pton(AF_INET, config->local, &laddr);
     if (err != 1) {
@@ -21,7 +21,7 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
         goto end;
     }
 
-	err = inet_pton(AF_INET, config->remote, &raddr);
+    err = inet_pton(AF_INET, config->remote, &raddr);
     if (err != 1) {
         err = 1;
         log_fatal("inet_pton(): bad remote address.\n");
@@ -48,8 +48,8 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
     }
 
     rtnl_link_set_name(sit_link, config->name);
-	rtnl_link_sit_set_local(sit_link, laddr);
-	rtnl_link_sit_set_remote(sit_link, raddr);
+    rtnl_link_sit_set_local(sit_link, laddr);
+    rtnl_link_sit_set_remote(sit_link, raddr);
     rtnl_link_sit_set_ttl(sit_link, 255);
     rtnl_link_set_flags(sit_link, IFF_UP);
 
@@ -129,7 +129,7 @@ end:
 
 int sit_get(struct nl_sock *sk, const char *name, struct rtnl_link **link) {
     struct nl_cache *cache;
-	int err;
+    int err;
 
     *link = NULL;
 
