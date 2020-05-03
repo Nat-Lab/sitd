@@ -1,6 +1,8 @@
 #include <sqlite3.h>
 #include <stdlib.h>
+#include <string.h>
 #include "log.h"
+#include "db.h"
 
 static sqlite3 *db = NULL;
 
@@ -19,7 +21,7 @@ static sqlite3_stmt *stmt_del_route = NULL;
 
 static sqlite3_stmt *stmt_last_id = NULL;
 
-int db_init();
+static int db_init();
 
 int db_open(const char *file) {
     if (db != NULL) {
@@ -35,7 +37,7 @@ int db_open(const char *file) {
     return -1;
 }
 
-int db_init() {
+static int db_init() {
     int err;
     char *errmsg;
 
@@ -48,10 +50,10 @@ int db_init() {
         "PRAGMA foreign_keys=ON;"
         "CREATE TABLE IF NOT EXISTS `tunnels` ("
             "`id`       INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,"
-            "`name`     TEXT NOT NULL,"
+            "`name`     TEXT NOT NULL UNIQUE,"
             "`local`    TEXT NOT NULL,"
-            "`remote`   TEXT NOT NULL,"
-            "`address`  TEXT NOT NULL"
+            "`remote`   TEXT NOT NULL UNIQUE,"
+            "`address`  TEXT NOT NULL UNIQUE,"
             "`mtu`      INTEGER NOT NULL DEFAULT 0"
         ");"
         "CREATE TABLE IF NOT EXISTS `routes` ("
@@ -128,8 +130,82 @@ int db_close() {
     return err;
 }
 
+int db_get_tunnels(sit_tunnel_t **tunnels) {
+    int err;
+    size_t n = 0;
+    *tunnels = NULL;
+
+    err = sqlite3_reset(stmt_get_tunnels);
+
+    if (err != SQLITE_OK) {
+        log_error("sqlite3_reset(): %s.\n", sqlite3_errmsg(db));
+        goto end;
+    }
+
+    // sqlite3_clear_bindings(stmt_get_tunnels);
+
+    *tunnels = (sit_tunnel_t *) malloc(sizeof(sit_tunnel_t));
+    sit_tunnel_t *current = *tunnels, *prev = NULL;
+
+    do {
+        err = sqlite3_step(stmt_get_tunnels);
+        if (err == SQLITE_DONE) break;
+        ++n;
+
+        if (err != SQLITE_ROW) {
+            log_error("sqlite3_step(): %s (%d).\n", sqlite3_errmsg(db), err);
+            goto end;
+        }
+
+        current->id = sqlite3_column_int(stmt_get_tunnels, 0);
+        strncpy(current->name, sqlite3_column_text(stmt_get_tunnels, 1), IFNAMSIZ);
+        strncpy(current->local, sqlite3_column_text(stmt_get_tunnels, 2), INET_ADDRSTRLEN);
+        strncpy(current->remote, sqlite3_column_text(stmt_get_tunnels, 3), INET_ADDRSTRLEN);
+        strncpy(current->address, sqlite3_column_text(stmt_get_tunnels, 4), INET6_ADDRSTRLEN + 4);
+        current->mtu = sqlite3_column_int(stmt_get_tunnels, 5);
+        
+        prev = current;
+        current->next = (sit_tunnel_t *) malloc(sizeof(sit_tunnel_t));
+        current = current->next;
+
+    } while (err != SQLITE_DONE);
+
+    err = 0;
+
+end:
+    if (prev == NULL) {
+        if (*tunnels != NULL) free(*tunnels);
+        *tunnels = NULL;
+    } else {
+        if (current != NULL) free(current);
+        prev->next = NULL;
+    }
+    return err;
+}
+
+void db_free_result_tunnels(sit_tunnel_t *tunnels) {
+    sit_tunnel_t *tunnel = tunnels, *next;
+    while (tunnel != NULL) {
+        next = tunnel->next;
+        free(tunnel);
+        tunnel = next;
+    }
+}
+
 int main () {
+    sit_tunnel_t *tunnels, *tunnel;
     db_open("test.db");
+    db_get_tunnels(&tunnels);
+
+    tunnel = tunnels;
+
+    while (tunnel != NULL) {
+        log_debug("%d name: %s, l: %s, r: %s, a: %s, m: %d.\n", tunnel->id, tunnel->name, tunnel->remote, tunnel->local, tunnel->address, tunnel->mtu);
+        tunnel = tunnel->next;
+    }
+
+    db_free_result_tunnels(tunnels);
+
     db_close();
     return 0;
 }

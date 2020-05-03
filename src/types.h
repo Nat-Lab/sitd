@@ -1,6 +1,7 @@
 #ifndef SITD_TYPES_H
 #define SITD_TYPES_H
 #include <stdint.h>
+#include <sys/socket.h>
 #include <linux/if.h>
 #include <netinet/in.h>
 
