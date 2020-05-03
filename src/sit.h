@@ -1,5 +1,5 @@
-#ifndef SITCTL_SIT_H
-#define SITCTL_SIT_H
+#ifndef SITD_SIT_H
+#define SITD_SIT_H
 #include <stdint.h>
 #include <netlink/route/link.h>
 
@@ -22,4 +22,4 @@ int sit_get(struct nl_sock *sk, const char *name, struct rtnl_link **link);
 int sit_create(struct nl_sock *sk, const sit_config_t *config);
 int sit_destroy(struct nl_sock *sk, const char *name);
 
-#endif // SITCTL_SIT_H
+#endif // SITD_SIT_H

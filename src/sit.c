@@ -198,6 +198,7 @@ int sit_get(struct nl_sock *sk, const char *name, struct rtnl_link **link) {
 
     struct rtnl_link *sit_link = rtnl_link_get_by_name(cache, name);
     if (sit_link == NULL) {
+        log_error("rtnl_link_get_by_name(): can't find interface %s.\n", name);
         err = 1;
         goto end;
     }
