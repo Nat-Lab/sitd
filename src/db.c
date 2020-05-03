@@ -193,21 +193,3 @@ void db_free_result_tunnels(sit_tunnel_t *tunnels) {
         tunnel = next;
     }
 }
-
-int main () {
-    sit_tunnel_t *tunnels, *tunnel;
-    db_open("test.db");
-    db_get_tunnels(&tunnels);
-
-    tunnel = tunnels;
-
-    while (tunnel != NULL) {
-        log_debug("%d name: %s, l: %s, r: %s, a: %s, m: %d, s: %d\n", tunnel->id, tunnel->name, tunnel->remote, tunnel->local, tunnel->address, tunnel->mtu, tunnel->state);
-        tunnel = tunnel->next;
-    }
-
-    db_free_result_tunnels(tunnels);
-
-    db_close();
-    return 0;
-}

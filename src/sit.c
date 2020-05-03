@@ -6,26 +6,27 @@
 #include <linux/if.h>
 #include "sit.h"
 #include "log.h"
+#include "types.h"
 
-int sit_create(struct nl_sock *sk, const sit_config_t *config) {
+int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_route_t *route) {
     struct nl_cache *cache = NULL;
     struct rtnl_link *sit_link;
     in_addr_t laddr, raddr;
     struct nl_addr* local_addr = NULL;
     struct rtnl_addr* rtnl_addr = NULL;
-    const sit_route_t *route_ptr = config->routes;
+    sit_route_t *route_ptr = route;
     int err, ifindex;
 
     /* create sit tunnel */
 
-    err = inet_pton(AF_INET, config->local, &laddr);
+    err = inet_pton(AF_INET, tunnel->local, &laddr);
     if (err != 1) {
         err = 1;
         log_fatal("inet_pton(): bad local address.\n");
         goto end;
     }
 
-    err = inet_pton(AF_INET, config->remote, &raddr);
+    err = inet_pton(AF_INET, tunnel->remote, &raddr);
     if (err != 1) {
         err = 1;
         log_fatal("inet_pton(): bad remote address.\n");
@@ -45,14 +46,14 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
         goto end;
     }
 
-    rtnl_link_set_name(sit_link, config->name);
+    rtnl_link_set_name(sit_link, tunnel->name);
     rtnl_link_sit_set_local(sit_link, laddr);
     rtnl_link_sit_set_remote(sit_link, raddr);
     rtnl_link_sit_set_ttl(sit_link, 255);
     rtnl_link_set_flags(sit_link, IFF_UP);
 
-    if (config->mtu != 0) {
-        rtnl_link_set_mtu(sit_link, config->mtu);
+    if (tunnel->mtu != 0) {
+        rtnl_link_set_mtu(sit_link, tunnel->mtu);
     }
 
     err = rtnl_link_add(sk, sit_link, NLM_F_CREATE);
@@ -65,7 +66,7 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
 
     /* configure tunnel address */
 
-    err = nl_addr_parse(config->address, AF_INET6, &local_addr);
+    err = nl_addr_parse(tunnel->address, AF_INET6, &local_addr);
     if (err < 0) {
         err = 1;
         log_fatal("nl_addr_parse(): %s.\n", nl_geterror(err));
@@ -73,7 +74,7 @@ int sit_create(struct nl_sock *sk, const sit_config_t *config) {
     }
 
     sit_link = NULL;
-    err = sit_get(sk, config->name, &sit_link);
+    err = sit_get(sk, tunnel->name, &sit_link);
     if (err < 0 || sit_link == NULL) {
         err = 1;
         log_fatal("sit_get(): can't get interface.\n");

@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 2.6)
-project (sitctl C)
+project (sitd C)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O2 -Wall -Wextra")
 
@@ -22,11 +22,13 @@ ELSE (NL_INCLUDE_DIR AND NL_LIBRARY)
     message(FATAL_ERROR "can't find libnl.")
 endif (NL_INCLUDE_DIR AND NL_LIBRARY)
 
+
 include_directories("${PROJECT_SOURCE_DIR}" "${NL_INCLUDE_DIR}")
 
-add_executable(sitctl 
+add_executable(sitd 
     src/sit.c
-    src/sitctl.c
+    src/sitd.c
+    src/db.c
 )
 
-target_link_libraries(sitctl ${NL_LIBRARIES})
+target_link_libraries(sitd ${NL_LIBRARIES} sqlite3)
