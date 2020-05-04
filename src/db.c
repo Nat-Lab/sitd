@@ -132,15 +132,16 @@ int db_close() {
 }
 
 int db_get_tunnels(sit_tunnel_t **tunnels) {
-    int err;
+    int err = 1;
     size_t n = 0;
+    sit_tunnel_t *current = *tunnels, *prev = NULL;
+
     *tunnels = (sit_tunnel_t *) malloc(sizeof(sit_tunnel_t));
     if (*tunnels == NULL) {
         log_fatal("malloc() failed.\n");
         goto end;
     }
 
-    sit_tunnel_t *current = *tunnels, *prev = NULL;
     memset(current, 0, sizeof(sit_tunnel_t));
 
     err = sqlite3_reset(stmt_get_tunnels);
