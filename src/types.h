@@ -1,6 +1,7 @@
 #ifndef SITD_TYPES_H
 #define SITD_TYPES_H
 #include <stdint.h>
+#include <jansson.h>
 #include <sys/socket.h>
 #include <linux/if.h>
 #include <netinet/in.h>
@@ -28,5 +29,10 @@ typedef struct sit_tunnel {
     uint32_t mtu;
     struct sit_tunnel *next;
 } sit_tunnel_t;
+
+int sit_tunnel_to_json(const sit_tunnel_t *tunnel, json_t **json);
+int sit_route_to_json(const sit_route_t *route, json_t **json);
+int json_to_sit_route(const json_t *json, sit_route_t **route);
+int json_to_sit_tunnel(const json_t *json, sit_route_t **route);
 
 #endif // SITD_TYPES_H
