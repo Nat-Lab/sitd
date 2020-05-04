@@ -25,27 +25,28 @@ int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_rout
 
     err = inet_pton(AF_INET, tunnel->local, &laddr);
     if (err != 1) {
-        err = 1;
-        log_fatal("inet_pton(): bad local address.\n");
+        err = SIT_ERROR;
+        log_error("inet_pton(): bad local address.\n");
         goto end;
     }
 
     err = inet_pton(AF_INET, tunnel->remote, &raddr);
     if (err != 1) {
-        err = 1;
-        log_fatal("inet_pton(): bad remote address.\n");
+        err = SIT_ERROR;
+        log_error("inet_pton(): bad remote address.\n");
         goto end;
     }
 
     err = rtnl_link_alloc_cache(sk, AF_UNSPEC, &cache);
     if (err < 0) {
+        err = SIT_FATAL;
         log_fatal("rtnl_link_alloc_cache(): %s.\n", nl_geterror(err));
         goto end;
     }
 
     sit_link = rtnl_link_sit_alloc();
     if (sit_link == NULL) {
-        err = 1;
+        err = SIT_FATAL;
         log_fatal("rtnl_link_sit_alloc(): can't allocate.\n");
         goto end;
     }
@@ -62,6 +63,7 @@ int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_rout
 
     err = rtnl_link_add(sk, sit_link, NLM_F_CREATE);
     if (err < 0) {
+        err = SIT_FATAL;
         log_fatal("rtnl_link_add(): %s.\n", nl_geterror(err));
         goto end;
     }
@@ -72,7 +74,7 @@ int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_rout
 
     err = nl_addr_parse(tunnel->address, AF_INET6, &local_addr);
     if (err < 0) {
-        err = 1;
+        err = SIT_ERROR;
         log_fatal("nl_addr_parse(): %s.\n", nl_geterror(err));
         goto end;
     }
@@ -80,7 +82,7 @@ int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_rout
     sit_link = NULL;
     err = sit_get(sk, tunnel->name, &sit_link);
     if (err < 0 || sit_link == NULL) {
-        err = 1;
+        err = SIT_FATAL;
         log_fatal("sit_get(): can't get interface.\n");
         goto end;
     }
@@ -88,7 +90,7 @@ int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_rout
     ifindex = rtnl_link_get_ifindex(sit_link);
     if (ifindex == 0) {
         log_fatal("rtnl_link_get_ifindex(): can't get interface index.\n");
-        err = 1;
+        err = SIT_FATAL;
         goto end;
     }
 
@@ -98,6 +100,7 @@ int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_rout
     
     err = rtnl_addr_add(sk, rtnl_addr, NLM_F_REPLACE);
     if (err < 0) {
+        err = SIT_FATAL;
         log_fatal("rtnl_addr_add(): %s.\n", nl_geterror(err));
         goto end;
     }
@@ -110,7 +113,7 @@ int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_rout
         struct nl_addr* address = NULL;
 
         if (rtnl_route == NULL) {
-            err = 1;
+            err = SIT_FATAL;
             log_fatal("rtnl_route_alloc(): can't alloc.\n");
             goto route_end;
         }
@@ -118,7 +121,8 @@ int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_rout
         rtnl_route_set_family(rtnl_route, AF_INET6);
         err = nl_addr_parse(route_ptr->prefix, AF_INET6, &address);
         if (err < 0) {
-            log_fatal("nl_addr_parse(): %s.\n", nl_geterror(err));
+            err = SIT_ERROR;
+            log_error("nl_addr_parse(): %s.\n", nl_geterror(err));
             goto route_end;
         }
 
@@ -127,7 +131,7 @@ int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_rout
         address = NULL;
 
         if (nexthop == NULL) {
-            err = 1;
+            err = SIT_FATAL;
             log_fatal("rtnl_route_nh_alloc(): can't alloc.\n");
             goto route_end;
         }
@@ -136,6 +140,7 @@ int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_rout
 
         err = nl_addr_parse(route_ptr->nexthop, AF_INET6, &address);
         if (err < 0) {
+            err = SIT_ERROR;
             log_fatal("nl_addr_parse(): %s.\n", nl_geterror(err));
             goto route_end;
         }
@@ -147,6 +152,7 @@ int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_rout
 
         err = rtnl_route_add(sk, rtnl_route, NLM_F_CREATE | NLM_F_REPLACE);
         if (err < 0) {
+            err = SIT_FATAL;
             log_fatal("rtnl_route_add(): %s.\n", nl_geterror(err));
             goto route_end;
         }
@@ -154,9 +160,8 @@ int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_rout
 route_end:
         if (address != NULL) nl_addr_put(address);
         if (rtnl_route != NULL) rtnl_route_put(rtnl_route);
-        // FIXME: free nexthop?
         route_ptr = route_ptr->next;
-        if (err != 0) goto end;
+        if (err != SIT_OK) goto end;
     }
 
 end:
@@ -173,13 +178,11 @@ int sit_destroy(struct nl_sock *sk, const char *name) {
     struct rtnl_link *sit_link;
 
     err = sit_get(sk, name, &sit_link);
-    if (err == 1) {
-        err = 0; // non fatal
-        goto end;
-    } else if (err < 0) goto end;
+    if (err != SIT_OK) goto end;
 
     err = rtnl_link_delete(sk, sit_link);
     if (err < 0) {
+        err = SIT_FATAL;
         log_fatal("rtnl_link_delete(): %s.\n", nl_geterror(err));
         goto end;
     }
@@ -197,6 +200,7 @@ int sit_get(struct nl_sock *sk, const char *name, struct rtnl_link **link) {
 
     err = rtnl_link_alloc_cache(sk, AF_UNSPEC, &cache);
     if (err < 0) {
+        err = SIT_FATAL;
         log_fatal("rtnl_link_alloc_cache(): %s.\n", nl_geterror(err));
         goto end;
     }
@@ -204,12 +208,12 @@ int sit_get(struct nl_sock *sk, const char *name, struct rtnl_link **link) {
     struct rtnl_link *sit_link = rtnl_link_get_by_name(cache, name);
     if (sit_link == NULL) {
         log_error("rtnl_link_get_by_name(): can't find interface %s.\n", name);
-        err = 1;
+        err = SIT_NOT_EXIST;
         goto end;
     }
 
     if (!rtnl_link_is_sit(sit_link)) {
-        err = -1;
+        err = SIT_ERROR;
         log_fatal("rtnl_link_is_sit(): link is not sit.\n");
         goto end;
     }
