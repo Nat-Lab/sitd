@@ -3,6 +3,7 @@
 #include <sys/socket.h>
 #include <string.h>
 #include <memory.h>
+#include <stdbool.h>
 #include "api.h"
 #include "log.h"
 #define RECV_BUFFER_SZ 0xffff
@@ -17,16 +18,26 @@ static handler_table_t *handlers = NULL;
 static handler_table_t *handlers_tail = NULL;
 static struct MHD_Daemon *api_server = NULL;
 
-void api_register_handler(const char* url_format, api_handler_t handler) {
+int api_register_handler(const char* url_format, api_handler_t handler) {
     if (handlers == NULL) {
         handlers = (handler_table_t *) malloc(sizeof(handler_table_t));
+        if (handlers == NULL) {
+            log_fatal("malloc() failed.\n");
+            return -1;
+        }
         handlers_tail = handlers;
     }
     handlers_tail->handler = handler;
     handlers_tail->url_format = url_format;
     handlers_tail->next = malloc(sizeof(handler_table_t));
+    if (handlers_tail->next == NULL) {
+        log_fatal("malloc() failed.\n");
+        return -1;
+    }
     handlers_tail = handlers_tail->next;
     handlers_tail->next = NULL;
+
+    return 0;
 }
 
 void api_clear_handlers() {
@@ -39,6 +50,8 @@ void api_clear_handlers() {
         free(handler);
         handler = next;
     }
+
+    handlers = NULL;
 }
 
 static void free_args (char **args, size_t url_args_count) {
@@ -56,7 +69,7 @@ static int try_invole_handler(struct MHD_Connection *conn, const char *method, c
 
         char **url_args = NULL;
         size_t url_args_count = 0;
-        int mismatch = 0;
+        bool mismatch = false;
 
         while (*handler_url_ptr != 0 && *url_ptr != 0) {
             while (*handler_url_ptr == *url_ptr && *url_ptr != 0) {
@@ -74,8 +87,19 @@ static int try_invole_handler(struct MHD_Connection *conn, const char *method, c
                 size_t arg_sz = url_ptr - var_begin_ptr + 1;
                 
                 if (url_args == NULL) {
+
                     url_args = (char **) malloc(sizeof(char *));
+                    if (url_args == NULL) {
+                        log_fatal("malloc() failed.\n");
+                        goto err_out;
+                    }
+
                     url_args[0] = (char *) malloc(arg_sz);
+                    if (url_args[0] == NULL) {
+                        log_fatal("malloc() failed.\n");
+                        goto err_out;
+                    }
+
                     memcpy(url_args[0], var_begin_ptr, arg_sz);
                     url_args[0][arg_sz - 1] = 0;
                     url_args_count = 1;
@@ -84,10 +108,15 @@ static int try_invole_handler(struct MHD_Connection *conn, const char *method, c
 
                     if (url_args == NULL) {
                         log_fatal("realloc() failed.\n");
-                        return -1;
+                        goto err_out;
                     }
 
                     url_args[url_args_count] = (char *) malloc(arg_sz);
+                    if (url_args[url_args_count] == NULL) {
+                        log_fatal("malloc() failed.\n");
+                        goto err_out;
+                    }
+
                     memcpy(url_args[url_args_count], var_begin_ptr, arg_sz);
                     url_args[url_args_count][arg_sz - 1] = 0;
                     ++url_args_count;
@@ -98,7 +127,7 @@ static int try_invole_handler(struct MHD_Connection *conn, const char *method, c
             
             if (*handler_url_ptr == *url_ptr) continue;
 
-            mismatch = 1;
+            mismatch = true;
             free_args(url_args, url_args_count);
             url_args = NULL;
             break;
@@ -107,13 +136,14 @@ static int try_invole_handler(struct MHD_Connection *conn, const char *method, c
         if (!mismatch && *handler_url_ptr == *url_ptr && *url_ptr == 0) {
             int res = table_ptr->handler(conn, method, url_args_count, (const char**) url_args, body);
             free_args(url_args, url_args_count);
+            url_args = NULL;
             return res;
         }
 
-
         table_ptr = table_ptr->next;
     }
-    
+
+err_out:
     return -1;
 }
 

@@ -135,6 +135,11 @@ int db_get_tunnels(sit_tunnel_t **tunnels) {
     int err;
     size_t n = 0;
     *tunnels = (sit_tunnel_t *) malloc(sizeof(sit_tunnel_t));
+    if (*tunnels == NULL) {
+        log_fatal("malloc() failed.\n");
+        goto end;
+    }
+
     sit_tunnel_t *current = *tunnels, *prev = NULL;
     memset(current, 0, sizeof(sit_tunnel_t));
 
@@ -167,6 +172,10 @@ int db_get_tunnels(sit_tunnel_t **tunnels) {
         
         prev = current;
         current->next = (sit_tunnel_t *) malloc(sizeof(sit_tunnel_t));
+        if (current->next == NULL) {
+            log_fatal("malloc() failed.\n");
+            goto end;
+        }
         current = current->next;
         memset(current, 0, sizeof(sit_tunnel_t));
 

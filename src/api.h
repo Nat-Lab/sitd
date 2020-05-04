@@ -9,7 +9,7 @@ typedef int (*api_handler_t)(struct MHD_Connection *connection, const char *meth
 int api_start(uint16_t port);
 int api_stop();
 
-void api_register_handler(const char* url_format, api_handler_t handler);
+int api_register_handler(const char* url_format, api_handler_t handler);
 void api_clear_handlers();
 
 int api_respond(struct MHD_Connection *connection, uint32_t http_code, const json_t *respond_body);
