@@ -5,7 +5,8 @@
 #define SIT_DB_OK 0
 #define SIT_DB_NOT_EXIST 1 
 #define SIT_DB_ALREADY_EXIST 2
-#define SIT_DB_FAIL 3
+#define SIT_DB_ERROR 3
+#define SIT_DB_FATAL 4
 
 int db_open(const char *file);
 int db_close();
