@@ -14,7 +14,7 @@ int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_rout
     in_addr_t laddr, raddr;
     struct nl_addr* local_addr = NULL;
     struct rtnl_addr* rtnl_addr = NULL;
-    sit_route_t *route_ptr = route;
+    const sit_route_t *route_ptr = route;
     int err, ifindex;
 
     /* create sit tunnel */
