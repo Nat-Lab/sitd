@@ -4,7 +4,7 @@
 #include <jansson.h>
 #include <stdint.h>
 
-typedef int (*api_handler_t)(struct MHD_Connection *connection, const char **url_args, size_t arg_count, const json_t *request_body);
+typedef int (*api_handler_t)(struct MHD_Connection *connection, const char *method, size_t arg_count, const char **url_args, const json_t *request_body);
 
 int api_start(uint16_t port);
 int api_stop();

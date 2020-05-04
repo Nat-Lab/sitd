@@ -46,7 +46,7 @@ static void free_args (char **args, size_t url_args_count) {
     free(args);
 }
 
-static int try_invole_handler(struct MHD_Connection *conn, const char *url, const json_t *body) {
+static int try_invole_handler(struct MHD_Connection *conn, const char *method, const char *url, const json_t *body) {
     handler_table_t *table_ptr = handlers;
 
     while (table_ptr != handlers_tail) {
@@ -102,9 +102,11 @@ static int try_invole_handler(struct MHD_Connection *conn, const char *url, cons
             break;
         }
 
-        if (!mismatch) {
-            return table_ptr->handler(conn, url_args, url_args_count, body);
+        if (!mismatch && *handler_url_ptr == *url_ptr && *url_ptr == 0) {
+            return table_ptr->handler(conn, method, url_args_count, (const char**) url_args, body);
         }
+
+        table_ptr = table_ptr->next;
     }
     
     return -1;
@@ -143,11 +145,20 @@ static int router (
         return MHD_YES;        
     }
 
-    log_debug("url: %s, method: %s, data (%d): %s.\n", url, method, buffer_size, buffer);
+    json_error_t err;
+    json_t *body = json_loadb(buffer, buffer_size, 0, &err);
 
-    // TODO
+    if (body == NULL) {
+        log_error("json_loadb(): (%d, %d) %s\n", err.line, err.position, err.text);
+        return MHD_NO;
+    }
 
-    log_debug("end.\n");
+    int res = try_invole_handler(connection, method, url, body);
+    if (res != 0) {
+        log_error("try_invole_handler(): %s %s: error finding/running handler.\n", method, url);
+        return MHD_NO;
+    }
+
     return MHD_YES;
 }
 
@@ -164,7 +175,7 @@ void api_respond(struct MHD_Connection *connection, uint32_t http_code, const js
 
 int api_start(uint16_t port) {
     api_server = MHD_start_daemon(
-        MHD_USE_DEBUG | MHD_USE_DUAL_STACK | MHD_USE_EPOLL_INTERNALLY, 
+        MHD_USE_DUAL_STACK | MHD_USE_EPOLL_INTERNALLY, 
         port, NULL, NULL, &router, NULL, 
         MHD_OPTION_CONNECTION_TIMEOUT, (uint32_t) 10, MHD_OPTION_END);
     
