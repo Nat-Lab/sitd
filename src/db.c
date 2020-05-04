@@ -145,8 +145,6 @@ int db_get_tunnels(sit_tunnel_t **tunnels) {
     memset(current, 0, sizeof(sit_tunnel_t));
 
     err = sqlite3_reset(stmt_get_tunnels);
-    // sqlite3_clear_bindings(stmt_get_tunnels);
-
     if (err != SQLITE_OK) {
         log_error("sqlite3_reset(): %s.\n", sqlite3_errmsg(db));
         goto end;
@@ -169,7 +167,7 @@ int db_get_tunnels(sit_tunnel_t **tunnels) {
         set_val_string(current->local, (char *) sqlite3_column_text(stmt_get_tunnels, 3), INET_ADDRSTRLEN);
         set_val_string(current->remote, (char *) sqlite3_column_text(stmt_get_tunnels, 4), INET_ADDRSTRLEN);
         set_val_string(current->address, (char *) sqlite3_column_text(stmt_get_tunnels, 5), INET6_ADDRSTRLEN + 4);
-        current->mtu = sqlite3_column_int(stmt_get_tunnels, 6);
+        set_val_numeric(current->mtu, sqlite3_column_int(stmt_get_tunnels, 6));
         
         prev = current;
         current->next = (sit_tunnel_t *) malloc(sizeof(sit_tunnel_t));
@@ -192,6 +190,63 @@ end:
         if (current != NULL) free(current);
         prev->next = NULL;
     }
+    return err;
+}
+
+int db_get_tunnel(const char* name, sit_tunnel_t **tunnel) {
+    *tunnel = NULL;
+    int err;
+
+    err = sqlite3_reset(stmt_get_tunnel);
+    if (err != SQLITE_OK) {
+        log_error("sqlite3_reset(): %s.\n", sqlite3_errmsg(db));
+        goto end;
+    }
+
+    err = sqlite3_clear_bindings(stmt_get_tunnel);
+    if (err != SQLITE_OK) {
+        log_error("sqlite3_clear_bindings(): %s.\n", sqlite3_errmsg(db));
+        goto end;
+    }
+
+    err = sqlite3_bind_text(stmt_get_tunnel, 1, name, -1, NULL);
+    if (err != SQLITE_OK) {
+        log_error("sqlite3_bind_text(): %s.\n", sqlite3_errmsg(db));
+        goto end;
+    }
+
+    err = sqlite3_step(stmt_get_tunnel);
+
+    if (err == SQLITE_DONE) goto end; // no results
+
+    if (err == SQLITE_ROW) {
+        *tunnel = (sit_tunnel_t *) malloc(sizeof(sit_tunnel_t));
+        sit_tunnel_t *current = *tunnel;
+        set_val_numeric(current->id, sqlite3_column_int(stmt_get_tunnel, 0));
+        set_val_numeric(current->state, sqlite3_column_int(stmt_get_tunnel, 1));
+        set_val_string(current->name, (char *) sqlite3_column_text(stmt_get_tunnel, 2), IFNAMSIZ);
+        set_val_string(current->name, (char *) sqlite3_column_text(stmt_get_tunnel, 2), IFNAMSIZ);
+        set_val_string(current->local, (char *) sqlite3_column_text(stmt_get_tunnel, 3), INET_ADDRSTRLEN);
+        set_val_string(current->remote, (char *) sqlite3_column_text(stmt_get_tunnel, 4), INET_ADDRSTRLEN);
+        set_val_string(current->address, (char *) sqlite3_column_text(stmt_get_tunnel, 5), INET6_ADDRSTRLEN + 4);
+        set_val_numeric(current->mtu, sqlite3_column_int(stmt_get_tunnel, 6));
+        current->next = NULL;
+    }
+
+    err = sqlite3_step(stmt_get_tunnel);
+    if (err != SQLITE_DONE) {
+        log_error("sqlite3_step(): expected SQLITE_DONE, but saw %d.\n", err);
+        goto end;
+    }
+    
+    err = SQLITE_OK;
+
+end:
+    if (err != SQLITE_OK && *tunnel != NULL) {
+        free(*tunnel);
+        *tunnel = NULL;
+    }
+
     return err;
 }
 
