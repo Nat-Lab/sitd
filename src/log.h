@@ -1,7 +1,7 @@
 #ifndef SITD_LOG
 #define SITD_LOG
 #include <stdio.h>
-#define __log(log_level, fmt, ...) fprintf(stderr, "[" log_level "] %s: " fmt, __PRETTY_FUNCTION__, ## __VA_ARGS__)
+#define __log(log_level, fmt, ...) fprintf(stderr, "[" log_level "] %s: " fmt, __func__, ## __VA_ARGS__)
 #define log_info(fmt, ...) __log("INFO ", fmt, ## __VA_ARGS__)
 #define log_warn(fmt, ...) __log("WARN ", fmt, ## __VA_ARGS__)
 #define log_error(fmt, ...) __log("ERROR", fmt, ## __VA_ARGS__)
