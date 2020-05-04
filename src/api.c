@@ -32,16 +32,17 @@ void api_register_handler(const char* url_format, api_handler_t handler) {
 void api_clear_handlers() {
     if (handlers == NULL) return;
 
-    handler_table_t *handler = handlers, *next = handlers->next;
+    handler_table_t *handler = handlers, *next = NULL;
 
     while (handler != NULL) {
+        if (handler != NULL) next = handler->next;
         free(handler);
-        handlers = next;
-        if (handlers != NULL) next = handlers->next;
+        handler = next;
     }
 }
 
 static void free_args (char **args, size_t url_args_count) {
+    if (args == NULL) return;
     for (int i = 0; i < url_args_count; i++) free(args[i]);
     free(args);
 }
@@ -99,12 +100,16 @@ static int try_invole_handler(struct MHD_Connection *conn, const char *method, c
 
             mismatch = 1;
             free_args(url_args, url_args_count);
+            url_args = NULL;
             break;
         }
 
         if (!mismatch && *handler_url_ptr == *url_ptr && *url_ptr == 0) {
-            return table_ptr->handler(conn, method, url_args_count, (const char**) url_args, body);
+            int res = table_ptr->handler(conn, method, url_args_count, (const char**) url_args, body);
+            free_args(url_args, url_args_count);
+            return res;
         }
+
 
         table_ptr = table_ptr->next;
     }
@@ -146,15 +151,17 @@ static int router (
     }
 
     json_error_t err;
-    json_t *body = json_loadb(buffer, buffer_size, 0, &err);
+    json_t *body = buffer_size > 0 ? json_loadb(buffer, buffer_size, 0, &err) : NULL;
 
-    if (body == NULL) {
+    if (body == NULL && buffer_size > 0) {
         log_error("json_loadb(): (%d, %d) %s\n", err.line, err.position, err.text);
         return MHD_NO;
     }
 
     int res = try_invole_handler(connection, method, url, body);
-    if (res != 0) {
+
+    json_decref(body);
+    if (res != MHD_YES) {
         log_error("try_invole_handler(): %s %s: error finding/running handler.\n", method, url);
         return MHD_NO;
     }
@@ -162,15 +169,23 @@ static int router (
     return MHD_YES;
 }
 
-void api_respond(struct MHD_Connection *connection, uint32_t http_code, const json_t *respond_body) {
+int api_respond(struct MHD_Connection *connection, uint32_t http_code, const json_t *respond_body) {
+    if (respond_body == NULL) {
+        log_error("respond body null.\n");
+        return MHD_NO;
+    }
+
+    int r;
     char *payload = json_dumps(respond_body, JSON_COMPACT);
 
     struct MHD_Response *response = MHD_create_response_from_buffer (strlen (payload), (void*) payload, MHD_RESPMEM_MUST_COPY);
     MHD_add_response_header(response, "Content-Type", "application/json");
     MHD_add_response_header(response, "Server", "sitd");
-    MHD_queue_response (connection, http_code, response);
+    r = MHD_queue_response (connection, http_code, response);
     MHD_destroy_response (response);
     free(payload);
+
+    return r;
 }
 
 int api_start(uint16_t port) {
