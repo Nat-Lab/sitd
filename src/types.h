@@ -1,5 +1,6 @@
 #ifndef SITD_TYPES_H
 #define SITD_TYPES_H
+#include <stdbool.h>
 #include <stdint.h>
 #include <jansson.h>
 #include <sys/socket.h>
@@ -11,24 +12,31 @@ typedef enum tunnel_state {
     STETE_STOPPED
 } tunnel_state_t;
 
+#define field(type, name) type name; bool name##_isset
+#define array_field(type, len, name) type name[len]; bool name##_isset
+
 typedef struct sit_route {
-    uint32_t id;
-    uint32_t tunnel_id;
-    char prefix[INET6_ADDRSTRLEN + 4];
-    char nexthop[INET6_ADDRSTRLEN];
+    field(uint32_t, id);
+    field(uint32_t, tunnel_id);
+    array_field(char, INET6_ADDRSTRLEN + 4, prefix);
+    array_field(char, INET6_ADDRSTRLEN, nexthop);
     struct sit_route *next;
 } sit_route_t;
 
 typedef struct sit_tunnel {
-    uint32_t id;
-    tunnel_state_t state;
-    char name[IFNAMSIZ];
-    char local[INET_ADDRSTRLEN];
-    char remote[INET_ADDRSTRLEN];
-    char address[INET6_ADDRSTRLEN + 4];
-    uint32_t mtu;
+    field(uint32_t, id);
+    field(tunnel_state_t, state);
+    array_field(char, IFNAMSIZ, name);
+    array_field(char, INET_ADDRSTRLEN, local);
+    array_field(char, INET_ADDRSTRLEN, remote);
+    array_field(char, INET6_ADDRSTRLEN + 4, address);
+    field(uint32_t, mtu);
     struct sit_tunnel *next;
 } sit_tunnel_t;
+
+#define set_val_numeric(obj_path, value) {obj_path = value; obj_path##_isset = true;}
+#define set_val_string(obj_path, src, length) {strncpy(obj_path, src, length); obj_path##_isset = true;}
+#define isset(obj_path) ( obj_path##_isset )
 
 int sit_tunnel_to_json(const sit_tunnel_t *tunnel, json_t **json);
 int sit_route_to_json(const sit_route_t *route, json_t **json);

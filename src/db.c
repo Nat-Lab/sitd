@@ -136,6 +136,7 @@ int db_get_tunnels(sit_tunnel_t **tunnels) {
     size_t n = 0;
     *tunnels = (sit_tunnel_t *) malloc(sizeof(sit_tunnel_t));
     sit_tunnel_t *current = *tunnels, *prev = NULL;
+    memset(current, 0, sizeof(sit_tunnel_t));
 
     err = sqlite3_reset(stmt_get_tunnels);
     // sqlite3_clear_bindings(stmt_get_tunnels);
@@ -155,17 +156,19 @@ int db_get_tunnels(sit_tunnel_t **tunnels) {
             goto end;
         }
 
-        current->id = sqlite3_column_int(stmt_get_tunnels, 0);
-        current->state = sqlite3_column_int(stmt_get_tunnels, 1);
-        strncpy(current->name, (char *) sqlite3_column_text(stmt_get_tunnels, 2), IFNAMSIZ);
-        strncpy(current->local, (char *) sqlite3_column_text(stmt_get_tunnels, 3), INET_ADDRSTRLEN);
-        strncpy(current->remote, (char *) sqlite3_column_text(stmt_get_tunnels, 4), INET_ADDRSTRLEN);
-        strncpy(current->address, (char *) sqlite3_column_text(stmt_get_tunnels, 5), INET6_ADDRSTRLEN + 4);
+        set_val_numeric(current->id, sqlite3_column_int(stmt_get_tunnels, 0));
+        set_val_numeric(current->state, sqlite3_column_int(stmt_get_tunnels, 1));
+        set_val_string(current->name, (char *) sqlite3_column_text(stmt_get_tunnels, 2), IFNAMSIZ);
+        set_val_string(current->name, (char *) sqlite3_column_text(stmt_get_tunnels, 2), IFNAMSIZ);
+        set_val_string(current->local, (char *) sqlite3_column_text(stmt_get_tunnels, 3), INET_ADDRSTRLEN);
+        set_val_string(current->remote, (char *) sqlite3_column_text(stmt_get_tunnels, 4), INET_ADDRSTRLEN);
+        set_val_string(current->address, (char *) sqlite3_column_text(stmt_get_tunnels, 5), INET6_ADDRSTRLEN + 4);
         current->mtu = sqlite3_column_int(stmt_get_tunnels, 6);
         
         prev = current;
         current->next = (sit_tunnel_t *) malloc(sizeof(sit_tunnel_t));
         current = current->next;
+        memset(current, 0, sizeof(sit_tunnel_t));
 
     } while (err != SQLITE_DONE);
 
