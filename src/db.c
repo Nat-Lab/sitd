@@ -26,7 +26,7 @@ static int db_init();
 int db_open(const char *file) {
     if (db != NULL) {
         log_fatal("database is already opened.\n");
-        return -1;
+        return SIT_DB_FAIL;
     }
 
     int err = sqlite3_open_v2(file, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
@@ -34,7 +34,7 @@ int db_open(const char *file) {
     if (err == SQLITE_OK) return db_init();
 
     log_fatal("sqlite3_open_v2(): %s.\n", sqlite3_errmsg(db));
-    return -1;
+    return SIT_DB_FAIL;
 }
 
 static int db_init() {
@@ -43,7 +43,7 @@ static int db_init() {
 
     if (db == NULL) {
         log_fatal("database not yet opened.\n");
-        return -1;
+        return SIT_DB_FAIL;
     }
 
     static const char create_tables[] = 
@@ -72,6 +72,7 @@ static int db_init() {
     err = sqlite3_exec(db, create_tables, NULL, NULL, &errmsg);
 
     if (err != SQLITE_OK) {
+        err = SIT_DB_FAIL;
         log_fatal("sqlite3_exec(): %s.\n", errmsg);
         goto end;
     }
@@ -92,6 +93,7 @@ static int db_init() {
     err += sqlite3_prepare_v2(db, "select last_insert_rowid()", -1, &stmt_last_id, NULL);
 
     if (err != SQLITE_OK) {
+        err = SIT_DB_FAIL;
         log_fatal("sqlite3_prepare_v2(): %s.\n", sqlite3_errmsg(db));
         goto end;
     }
@@ -104,7 +106,7 @@ end:
 int db_close() {
     if (db == NULL) {
         log_fatal("database not yet opened.\n");
-        return -1;
+        return SIT_DB_FAIL;
     }
 
     int err = sqlite3_close_v2(db);
@@ -128,16 +130,17 @@ int db_close() {
     stmt_get_routes = stmt_get_tunnel = stmt_insert_route = 
         stmt_insert_tunnel = stmt_update_route = stmt_update_tunnel = NULL;
 
-    return err;
+    return err == SQLITE_OK ? SIT_DB_OK : SIT_DB_FAIL;
 }
 
 int db_get_tunnels(sit_tunnel_t **tunnels) {
-    int err = 1;
+    int err;
     size_t n = 0;
     sit_tunnel_t *current = *tunnels, *prev = NULL;
 
     *tunnels = (sit_tunnel_t *) malloc(sizeof(sit_tunnel_t));
     if (*tunnels == NULL) {
+        err = SIT_DB_FAIL;
         log_fatal("malloc() failed.\n");
         goto end;
     }
@@ -146,6 +149,7 @@ int db_get_tunnels(sit_tunnel_t **tunnels) {
 
     err = sqlite3_reset(stmt_get_tunnels);
     if (err != SQLITE_OK) {
+        err = SIT_DB_FAIL;
         log_error("sqlite3_reset(): %s.\n", sqlite3_errmsg(db));
         goto end;
     }
@@ -156,6 +160,7 @@ int db_get_tunnels(sit_tunnel_t **tunnels) {
         ++n;
 
         if (err != SQLITE_ROW) {
+            err = SIT_DB_FAIL;
             log_error("sqlite3_step(): %s (%d).\n", sqlite3_errmsg(db), err);
             goto end;
         }
@@ -180,7 +185,7 @@ int db_get_tunnels(sit_tunnel_t **tunnels) {
 
     } while (err != SQLITE_DONE);
 
-    err = 0;
+    err = prev == NULL ? SIT_DB_NOT_EXIST : SIT_DB_OK;
 
 end:
     if (prev == NULL) {
@@ -199,25 +204,31 @@ int db_get_tunnel(const char* name, sit_tunnel_t **tunnel) {
 
     err = sqlite3_reset(stmt_get_tunnel);
     if (err != SQLITE_OK) {
+        err = SIT_DB_FAIL;
         log_error("sqlite3_reset(): %s.\n", sqlite3_errmsg(db));
         goto end;
     }
 
     err = sqlite3_clear_bindings(stmt_get_tunnel);
     if (err != SQLITE_OK) {
+        err = SIT_DB_FAIL;
         log_error("sqlite3_clear_bindings(): %s.\n", sqlite3_errmsg(db));
         goto end;
     }
 
     err = sqlite3_bind_text(stmt_get_tunnel, 1, name, -1, NULL);
     if (err != SQLITE_OK) {
+        err = SIT_DB_FAIL;
         log_error("sqlite3_bind_text(): %s.\n", sqlite3_errmsg(db));
         goto end;
     }
 
     err = sqlite3_step(stmt_get_tunnel);
 
-    if (err == SQLITE_DONE) goto end; // no results
+    if (err == SQLITE_DONE) {
+        err = SIT_DB_NOT_EXIST;
+        goto end;
+    }
 
     if (err == SQLITE_ROW) {
         *tunnel = (sit_tunnel_t *) malloc(sizeof(sit_tunnel_t));
@@ -235,14 +246,15 @@ int db_get_tunnel(const char* name, sit_tunnel_t **tunnel) {
 
     err = sqlite3_step(stmt_get_tunnel);
     if (err != SQLITE_DONE) {
+        err = SIT_DB_FAIL;
         log_error("sqlite3_step(): expected SQLITE_DONE, but saw %d.\n", err);
         goto end;
     }
     
-    err = SQLITE_OK;
+    err = SIT_DB_OK;
 
 end:
-    if (err != SQLITE_OK && *tunnel != NULL) {
+    if (err != SIT_DB_OK && *tunnel != NULL) {
         free(*tunnel);
         *tunnel = NULL;
     }
