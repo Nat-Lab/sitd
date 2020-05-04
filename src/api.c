@@ -209,5 +209,6 @@ int api_stop() {
     }
 
     MHD_stop_daemon(api_server);
+    api_server = NULL;
     return 0;
 }
