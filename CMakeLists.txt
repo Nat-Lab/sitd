@@ -22,13 +22,13 @@ ELSE (NL_INCLUDE_DIR AND NL_LIBRARY)
     message(FATAL_ERROR "can't find libnl.")
 endif (NL_INCLUDE_DIR AND NL_LIBRARY)
 
-
 include_directories("${PROJECT_SOURCE_DIR}" "${NL_INCLUDE_DIR}")
 
 add_executable(sitd 
+    src/api.c
     src/sit.c
     src/sitd.c
     src/db.c
 )
 
-target_link_libraries(sitd ${NL_LIBRARIES} sqlite3)
+target_link_libraries(sitd microhttpd jansson sqlite3 ${NL_LIBRARIES})
