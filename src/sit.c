@@ -1,12 +1,16 @@
 #include <netlink/route/link/sit.h>
 #include <netlink/route/addr.h>
 #include <netlink/route/route.h>
-
+#include <netlink/version.h>
 #include <arpa/inet.h>
 #include <linux/if.h>
 #include "sit.h"
 #include "log.h"
 #include "types.h"
+
+#if LIBNL_VER_NUM < LIBNL_VER(3, 5)
+extern int rtnl_link_is_sit(struct rtnl_link *link);
+#endif
 
 int sit_configure(struct nl_sock *sk, const sit_tunnel_t *tunnel, const sit_route_t *route) {
     struct nl_cache *cache = NULL;
