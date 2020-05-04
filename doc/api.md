@@ -42,6 +42,8 @@ ERR_BAD_REMOTE|invalid remote address.
 ERR_BAD_ADDRESS|invalid IPv6 interface address.
 ERR_BAD_MTU|invalid MTU.
 ERR_BAD_NEXTHOP|invalid nexthop.
+ERR_NOT_FOUND|object not found.
+ERR_EXIST|object already exist.
 
 ### TunnelState
 
